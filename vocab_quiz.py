@@ -106,7 +106,7 @@ def main():
             break
             
         if answer.lower() == 's':
-            print(f"跳过！正确答案是：{current_word[current_type]}")
+            print(f"跳过！正确答案是：{current_word[current_type]} ({current_word['kana' if current_type == 'kanji' else 'kanji']})")
             current_word = None
             total_count += 1
             continue
@@ -117,7 +117,7 @@ def main():
             total_count += 1
             current_word = None
         else:
-            print(f"✗ 回答错误！正确答案是：{current_word[current_type]}")
+            print(f"✗ 回答错误！正确答案是：{current_word[current_type]} ({current_word['kana' if current_type == 'kanji' else 'kanji']})")
             print("请重试：")
 
 if __name__ == "__main__":
