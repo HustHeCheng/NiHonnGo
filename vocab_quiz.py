@@ -64,8 +64,12 @@ class VocabQuiz:
 
     def check_answer(self, word, user_answer, answer_type):
         if answer_type == 'kanji':
-            # 移除假名部分（【】之间的内容）和空格
-            kanji = re.sub(r'【.*?】', '', word['kanji']).strip()
+            # 从【】中提取汉字部分
+            kanji_match = re.search(r'【(.*?)】', word['kanji'] if '【' in word['kanji'] else word['kana'])
+            if kanji_match:
+                kanji = kanji_match.group(1)
+            else:
+                kanji = word['kanji']
             return user_answer.strip() == kanji
         else:  # kana
             # 移除注释部分（【】及其内容）和空格
@@ -75,12 +79,18 @@ class VocabQuiz:
     def format_answer(self, word, answer_type):
         """格式化答案显示"""
         if answer_type == 'kanji':
-            main = re.sub(r'【.*?】', '', word['kanji']).strip()
-            other = word['kana']
+            # 当要求输入汉字时，显示汉字为主要答案
+            # 从【】中提取汉字部分
+            kanji_match = re.search(r'【(.*?)】', word['kanji'] if '【' in word['kanji'] else word['kana'])
+            if kanji_match:
+                kanji = kanji_match.group(1)
+            else:
+                kanji = word['kanji']
+            return f"{kanji}（{word['kana']}）"
         else:
-            main = re.sub(r'【.*?】', '', word['kana']).strip()
-            other = word['kanji']
-        return f"{main}（{other}）"
+            # 当要求输入假名时，显示假名为主要答案
+            kana = re.sub(r'【.*?】', '', word['kana']).strip()
+            return f"{kana}（{word['kanji']}）"
 
 def main():
     quiz = VocabQuiz('./dict/xsj/xsjrihanshuangjie.mdx')
