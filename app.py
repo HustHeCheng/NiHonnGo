@@ -4,6 +4,11 @@ import random
 import time
 from collections import deque
 import os
+import sqlite3
+from pathlib import Path
+import gzip
+import shutil
+import re
 
 app = Flask(__name__)
 
@@ -146,6 +151,136 @@ en_to_zh = {
     'autumn': '秋天',
     'winter': '冬天'
 }
+
+def download_edict():
+    """下载并解析 EDICT 词典文件"""
+    import gzip
+    import shutil
+    import re
+    from pathlib import Path
+
+    edict_file = Path('edict2.gz')
+    edict_txt = Path('edict2.txt')
+    edict_db = Path('edict.db')
+    
+    # 如果已经有解析好的数据库，直接返回
+    if edict_db.exists():
+        return True
+
+    try:
+        # 下载词典文件
+        if not edict_file.exists():
+            print("下载 EDICT 词典文件...")
+            url = "http://ftp.edrdg.org/pub/Nihongo/edict2.gz"
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            with open(edict_file, 'wb') as f:
+                shutil.copyfileobj(response.raw, f)
+
+        # 解压缩
+        if not edict_txt.exists():
+            print("解压缩词典文件...")
+            with gzip.open(edict_file, 'rb') as f_in:
+                with open(edict_txt, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+
+        # 解析并存储到SQLite数据库
+        print("解析词典并存储到数据库...")
+        import sqlite3
+        conn = sqlite3.connect(edict_db)
+        c = conn.cursor()
+        
+        # 创建表
+        c.execute('''CREATE TABLE IF NOT EXISTS edict
+                    (id INTEGER PRIMARY KEY,
+                     kanji TEXT,
+                     kana TEXT,
+                     meanings TEXT,
+                     tags TEXT)''')
+
+        # 编译正则表达式
+        entry_pattern = re.compile(r'^([^ ]+) \[([^\]]+)\] /(.+)/$')
+        jlpt_pattern = re.compile(r'(N[1-5])')
+
+        # 读取并解析文件
+        with open(edict_txt, 'r', encoding='euc-jp') as f:
+            next(f)  # 跳过首行
+            for line in f:
+                try:
+                    match = entry_pattern.match(line)
+                    if match:
+                        kanji_kana = match.group(1)
+                        kana = match.group(2)
+                        meanings = match.group(3)
+                        
+                        # 提取JLPT等级
+                        jlpt_match = jlpt_pattern.search(meanings)
+                        jlpt_level = jlpt_match.group(1) if jlpt_match else None
+                        
+                        # 如果第一部分包含假名，则没有汉字
+                        if re.match(r'^[ぁ-んァ-ン]+$', kanji_kana):
+                            kanji = ''
+                            kana = kanji_kana
+                        else:
+                            kanji = kanji_kana
+
+                        c.execute('INSERT INTO edict (kanji, kana, meanings, tags) VALUES (?, ?, ?, ?)',
+                                (kanji, kana, meanings, jlpt_level))
+                except Exception as e:
+                    print(f"解析错误: {e} at line: {line}")
+                    continue
+
+        conn.commit()
+        conn.close()
+
+        # 清理临时文件
+        edict_file.unlink()
+        edict_txt.unlink()
+        
+        print("EDICT 词典处理完成")
+        return True
+
+    except Exception as e:
+        print(f"下载或处理 EDICT 词典时出错: {e}")
+        return False
+
+def get_edict_words(level, limit=20):
+    """从EDICT数据库获取指定级别的词汇"""
+    try:
+        if not Path('edict.db').exists():
+            if not download_edict():
+                return []
+
+        conn = sqlite3.connect('edict.db')
+        c = conn.cursor()
+        
+        # 随机获取指定级别的词汇
+        c.execute('''SELECT kanji, kana, meanings FROM edict 
+                    WHERE tags = ? AND kanji != ""
+                    ORDER BY RANDOM() LIMIT ?''', (level, limit))
+        
+        words = []
+        for row in c.fetchall():
+            kanji, kana, meanings = row
+            
+            # 提取第一个英文含义
+            meaning = meanings.split('/')[0].strip()
+            
+            # 尝试将英文转换为中文
+            chinese = en_to_zh.get(meaning.lower(), meaning)
+            
+            words.append({
+                'kanji': kanji,
+                'kana': kana,
+                'chinese': chinese
+            })
+        
+        conn.close()
+        return words
+
+    except Exception as e:
+        print(f"从EDICT获取词汇时出错: {e}")
+        return []
 
 def get_jisho_words(level):
     """从Jisho API获取词汇"""
@@ -317,7 +452,7 @@ def get_jisho_words(level):
     return words
 
 def get_vocabulary(level='N5'):
-    """获取指定级别的词汇，如果缓存不足则从API获取新词"""
+    """获取指定级别的词汇，优先使用EDICT数据库"""
     current_time = time.time()
     
     # 如果缓存为空或者已经过了5分钟，重新获取词汇
@@ -325,9 +460,31 @@ def get_vocabulary(level='N5'):
         level not in word_cache['last_fetch'] or 
         current_time - word_cache['last_fetch'].get(level, 0) > 300):
         
-        new_words = get_jisho_words(level)
-        word_cache[level].extend(new_words)
-        word_cache['last_fetch'][level] = current_time
+        # 首先尝试从EDICT获取词汇
+        new_words = get_edict_words(level)
+        
+        # 如果EDICT获取失败，回退到Jisho API
+        if not new_words:
+            print("从EDICT获取词汇失败，尝试使用Jisho API...")
+            new_words = get_jisho_words(level)
+        
+        if new_words:
+            word_cache[level].extend(new_words)
+            word_cache['last_fetch'][level] = current_time
+        else:
+            print("无法获取新词汇，使用默认词汇...")
+            # 使用一些基本词汇作为后备
+            new_words = [
+                {'kanji': '本', 'kana': 'ほん', 'chinese': '书'},
+                {'kanji': '猫', 'kana': 'ねこ', 'chinese': '猫'},
+                {'kanji': '犬', 'kana': 'いぬ', 'chinese': '狗'},
+                {'kanji': '水', 'kana': 'みず', 'chinese': '水'},
+                {'kanji': '月', 'kana': 'つき', 'chinese': '月亮'},
+                {'kanji': '日', 'kana': 'ひ', 'chinese': '太阳'},
+                {'kanji': '火', 'kana': 'ひ', 'chinese': '火'},
+                {'kanji': '木', 'kana': 'き', 'chinese': '树'},
+            ]
+            word_cache[level].extend(new_words)
     
     return list(word_cache[level])
 
