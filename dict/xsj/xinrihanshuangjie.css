@@ -1,0 +1,110 @@
+body {
+  font-size: 15px;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+ul {
+  display: inline;
+  list-style-type: none;
+  padding-inline-start: 1px;
+  word-break: break-word;
+  word-wrap: break-word;
+}
+
+li {
+  word-break: break-word;
+  word-wrap: break-word;
+}
+
+.divide-imgs::before {
+    content: '\A';
+    white-space: pre;
+}
+
+.divide-imgs {
+    
+}
+
+img {
+  height: 16px;
+  width: 16px;
+}
+
+.divide-imgs img {
+  padding-left: 12px;
+  padding-right: 4px;
+  height: 16px;
+  width: 16px;
+}
+
+.sense-field {
+    padding-right: 2px;
+  color: rgb(158, 105, 40);
+  display: inline-block;
+}
+
+.dot {
+    visibility: hidden;
+}
+
+.dot::before {
+  visibility: visible;
+  content: "·";
+  display: inline;
+  padding-right: 6px;
+  opacity: 1;
+}
+
+p {
+  display: inline;
+}
+
+.example-source + span {
+  color: rgb(145, 145, 145);
+  display: block;
+  padding-left: 10px;
+}
+
+.ncdata-sense-id {
+  color: rgb(110, 110, 110);
+  display: inline;
+}
+
+li {
+  display: inline;
+}
+
+.ncdata-sense {
+  padding-bottom: 5px;
+}
+
+.divide-imgs + span {
+  color: rgb(20, 62, 127);
+}
+
+.dotted-line {
+  border-top: 1px dashed rgb(163, 163, 163);
+}
+
+a:link {
+  color: black;
+  text-decoration: none;
+}
+
+.phrase-wrap {
+    margin-top: 2px;
+    margin-bottom: 18px;
+    display: block;
+    padding-left: 4px;
+}
+
+.phrase-wrap + h1 {
+    margin-bottom: 1px;
+}
+
+.unit-example {
+    margin-left: 6px;
+}
