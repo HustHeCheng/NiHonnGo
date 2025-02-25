@@ -89,8 +89,11 @@ def main():
             current_type = random.choice(['kanji', 'kana'])
             print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             print(f"第 {total_count + 1} 题")
-            print(f"中文释义：{current_word['meaning']}")
-            print(f"请输入{'汉字' if current_type == 'kanji' else '假名'}写法：")
+            print(f"单词解释：")
+            print(f"【中文】{current_word['meaning']}")
+            other_type = 'kana' if current_type == 'kanji' else 'kanji'
+            print(f"【日语】{current_word[other_type]}")
+            print(f"请输入这个单词的{'汉字' if current_type == 'kanji' else '假名'}写法：")
         
         answer = input().strip()
         
