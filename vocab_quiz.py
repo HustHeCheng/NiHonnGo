@@ -64,9 +64,23 @@ class VocabQuiz:
 
     def check_answer(self, word, user_answer, answer_type):
         if answer_type == 'kanji':
-            return user_answer.strip() == word['kanji']
+            # 移除假名部分（【】之间的内容）和空格
+            kanji = re.sub(r'【.*?】', '', word['kanji']).strip()
+            return user_answer.strip() == kanji
         else:  # kana
-            return user_answer.strip() == word['kana']
+            # 移除注释部分（【】及其内容）和空格
+            kana = re.sub(r'【.*?】', '', word['kana']).strip()
+            return user_answer.strip() == kana
+
+    def format_answer(self, word, answer_type):
+        """格式化答案显示"""
+        if answer_type == 'kanji':
+            main = re.sub(r'【.*?】', '', word['kanji']).strip()
+            other = word['kana']
+        else:
+            main = re.sub(r'【.*?】', '', word['kana']).strip()
+            other = word['kanji']
+        return f"{main}（{other}）"
 
 def main():
     quiz = VocabQuiz('./dict/xsj/xsjrihanshuangjie.mdx')
@@ -106,7 +120,7 @@ def main():
             break
             
         if answer.lower() == 's':
-            print(f"跳过！正确答案是：{current_word[current_type]} ({current_word['kana' if current_type == 'kanji' else 'kanji']})")
+            print(f"跳过！正确答案是：{quiz.format_answer(current_word, current_type)}")
             current_word = None
             total_count += 1
             continue
@@ -117,7 +131,7 @@ def main():
             total_count += 1
             current_word = None
         else:
-            print(f"✗ 回答错误！正确答案是：{current_word[current_type]} ({current_word['kana' if current_type == 'kanji' else 'kanji']})")
+            print(f"✗ 回答错误！正确答案是：{quiz.format_answer(current_word, current_type)}")
             print("请重试：")
 
 if __name__ == "__main__":
